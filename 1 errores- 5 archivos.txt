@@ -1,0 +1,651 @@
+========================================
+ARCHIVO: CuentaBancaria.java
+========================================
+
+------------ NIVEL 🟢 FÁCIL (SINTAXIS) ------------
+
+[Error 1] Falta punto y coma
+public abstract class CuentaBancaria {
+    protected String numeroCuenta
+    protected String contrasenaHash; // ❌ Falta ;
+}
+
+[Error 2] Paréntesis mal cerrado en constructor
+public CuentaBancaria(String numeroCuenta, String nombreTitular, String documentoTitular {
+    this.numeroCuenta = numeroCuenta;
+} // ❌ Falta ) en parámetros
+
+[Error 3] Tipo incorrecto en BigDecimal
+this.tasaInteresMensual = "0.01"; // ❌ Debería ser new BigDecimal("0.01")
+
+[Error 4] Llave de cierre extra
+public abstract class CuentaBancaria {
+    // ... código
+}
+} // ❌ Llave de más
+
+------------ NIVEL 🟡 MEDIO (LÓGICA) ------------
+
+[Error 5] No valida contraseña nula
+public boolean validarContrasena(String contrasena) {
+    // ❌ Si contrasena es null, lanza NullPointerException
+    return this.contrasenaHash.equals(contrasena);
+}
+
+[Error 6] No reinicia intentosFallidos al cambiar contraseña
+// ❌ Si cambia la contraseña, los intentosFallidos deberían reiniciarse
+// Falta método: public void cambiarContrasena(String nueva)
+
+[Error 7] Puede retirar incluso con saldo negativo después de operación
+public void retirar(BigDecimal monto) {
+    if (puedeRetirar(monto)) {
+        this.saldoDisponible = saldoDisponible.subtract(monto);
+        // ❌ No valida que saldoDisponible no quede negativo
+    }
+}
+
+[Error 8] No valida montos negativos
+public void depositar(BigDecimal monto) {
+    this.saldoDisponible = saldoDisponible.add(monto); // ❌ Podría depositar -1000
+}
+
+------------ NIVEL 🟠 DIFÍCIL (POO) ------------
+
+[Error 9] Clase abstracta sin métodos abstractos suficientes
+public abstract class CuentaBancaria {
+    // ❌ Solo tiene 2 métodos abstractos, debería tener más
+    // Ej: abstract void aplicarCargosMensuales()
+}
+
+[Error 10] Atributo cuentasFavoritas expuesto
+public List<String> getCuentasFavoritas() { 
+    return cuentasFavoritas; // ❌ Expone la lista original
+}
+// Debería ser: return new ArrayList<>(cuentasFavoritas);
+
+[Error 11] Método registrarIntentoFallido sin límite de tiempo
+public void registrarIntentoFallido() {
+    this.intentosFallidos++;
+    // ❌ No considera si los intentos son de hace meses
+    // Debería resetear después de X tiempo sin fallos
+}
+
+[Error 12] No hay método para desbloquear cuenta
+public void desbloquearCuenta() {
+    // ❌ No existe método para desbloquear
+    // this.estaBloqueada = false;
+    // this.intentosFallidos = 0;
+}
+
+------------ NIVEL 🔴 COMPLEJO (DISEÑO) ------------
+
+[Error 13] Almacenamiento de contraseña en texto plano
+protected String contrasenaHash; // ❌ El nombre sugiere hash, pero se guarda texto
+// Debería tener método: private String hashContrasena(String contrasena)
+
+[Error 14] No hay validación de documento de identidad
+public CuentaBancaria(String numeroCuenta, String nombreTitular, String documentoTitular) {
+    // ❌ No valida formato del documento
+    // Debería: if(!documento.valido()) throw exception
+}
+
+[Error 15] Acoplamiento con BigDecimal sin manejo de escala
+public BigDecimal getSaldoDisponible() { return saldoDisponible; }
+// ❌ No garantiza escala (decimales) consistente
+// Debería: return saldoDisponible.setScale(2, RoundingMode.HALF_UP);
+
+[Error 16] No hay registro de transacciones
+// ❌ La cuenta no guarda historial de movimientos
+// Debería tener: private List<Transaccion> historialTransacciones;
+
+[Error 17] Cupos diarios no se resetean automáticamente
+protected BigDecimal montoRetiradoHoy;
+protected BigDecimal montoTransferidoHoy;
+// ❌ No hay método que resetee estos valores cada día
+// Debería: public void resetearContadoresDiarios()
+
+[Error 18] No hay límite de cuentas favoritas
+public void agregarFavorita(String numeroCuenta) {
+    // ❌ Podría agregar 1000 favoritas sin límite
+    if (!cuentasFavoritas.contains(numeroCuenta)) {
+        cuentasFavoritas.add(numeroCuenta);
+    }
+}
+
+[Error 19] Métodos puedeRetirar y puedeTransferir duplican lógica
+// ❌ Comparten la misma validación de saldo y bloqueo
+// Deberían usar un método privado: private boolean puedeOperar(BigDecimal monto)
+
+[Error 20] No valida que el titular sea mayor de edad
+// ❌ Debería validar edad basada en documento
+// Falta: private int calcularEdad()
+--------------------------------------------------------------------
+
+package model.cuentas;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+
+/**
+ *
+ * @author ISC Israel de Jesus Mar Parada
+ */
+public class CuentaAhorro extends CuentaBancaria{
+private BigDecimal interesAcumulado;
+    private int mesesSinMovimiento;
+    private BigDecimal saldoMinimoRequerido;
+
+    public CuentaAhorro(String numeroCuenta, String nombreTitular, String documentoTitular) {
+        super(numeroCuenta, nombreTitular, documentoTitular);
+        this.interesAcumulado = BigDecimal.ZERO;
+        this.mesesSinMovimiento = 0;
+        this.saldoMinimoRequerido = new BigDecimal("50000"); // $50,000 por defecto
+        this.tasaInteresMensual = new BigDecimal("0.015"); // 1.5% mensual
+    }
+
+    @Override
+    public BigDecimal calcularIntereses() {
+        BigDecimal intereses = saldoDisponible.multiply(tasaInteresMensual);
+        this.interesAcumulado = interesAcumulado.add(intereses);
+        return intereses;
+    }
+
+    @Override
+    public boolean validarCondicionesEspeciales() {
+        // Validar que no supere el saldo mínimo
+        return saldoDisponible.compareTo(saldoMinimoRequerido) >= 0;
+    }
+
+    public void actualizarMesesSinMovimiento() {
+        long meses = ChronoUnit.MONTHS.between(fechaUltimoAcceso, LocalDateTime.now());
+        this.mesesSinMovimiento = (int) meses;
+    }
+
+    public boolean tieneInactividad() {
+        return mesesSinMovimiento >= 6; // Inactiva después de 6 meses
+    }
+
+    // Getters y Setters
+    public BigDecimal getInteresAcumulado() { return interesAcumulado; }
+    public void setInteresAcumulado(BigDecimal interesAcumulado) { this.interesAcumulado = interesAcumulado; }
+
+    public int getMesesSinMovimiento() { return mesesSinMovimiento; }
+    public void setMesesSinMovimiento(int mesesSinMovimiento) { this.mesesSinMovimiento = mesesSinMovimiento; }
+
+    public BigDecimal getSaldoMinimoRequerido() { return saldoMinimoRequerido; }
+    public void setSaldoMinimoRequerido(BigDecimal saldoMinimoRequerido) { this.saldoMinimoRequerido = saldoMinimoRequerido; }
+}//fin de la clase
+-------------------------------------------------------------
+========================================
+ARCHIVO: CuentaCorriente.java
+========================================
+
+------------ NIVEL 🟢 FÁCIL (SINTAXIS) ------------
+
+[Error 1] Herencia mal escrita
+public class CuentaCorriente extends CuentaBancaria { // ❌ Correcto
+    private BigDecimal saldoMinimoRequerido
+    private BigDecimal comisionManejo; // ❌ Falta ;
+}
+
+[Error 2] Paréntesis en condición
+public void cobrarComisionManejo( {
+    if (saldoDisponible.compareTo(comisionManejo) >= 0) {
+        this.saldoDisponible = saldoDisponible.subtract(comisionManejo);
+    }
+} // ❌ Paréntesis mal cerrado
+
+[Error 3] Tipo incorrecto en comparación
+public boolean validarCondicionesEspeciales() {
+    return saldoDisponible.compareTo(comisionManejo) >= "0"; // ❌ Comparando con String
+}
+
+[Error 4] Llave de cierre extra
+public class CuentaCorriente extends CuentaBancaria {
+    // ... código
+}
+} // ❌ Llave de más
+
+------------ NIVEL 🟡 MEDIO (LÓGICA) ------------
+
+[Error 5] No valida que el sobregiro no exceda el límite
+public void cobrarComisionManejo() {
+    BigDecimal faltante = comisionManejo.subtract(saldoDisponible);
+    if (faltante.compareTo(sobregiroAutorizado) <= 0) {
+        this.saldoDisponible = BigDecimal.ZERO;
+        this.sobregiroAutorizado = sobregiroAutorizado.subtract(faltante);
+        // ❌ Si faltante es mayor, no hace nada? Debería rechazar
+    }
+}
+
+[Error 6] Puede usar cheques aunque no tenga saldo
+public void usarCheque() {
+    if (chequesDisponibles > 0) {
+        this.chequesDisponibles--; // ❌ No valida si hay saldo
+    }
+}
+
+[Error 7] No reintegra el sobregiro cuando deposita
+// ❌ Si usa sobregiro y luego deposita, no repone el sobregiro
+// Debería: depositar() debería reponer sobregiro primero
+
+[Error 8] No valida montos negativos en retiro
+@Override
+public boolean puedeRetirar(BigDecimal monto) {
+    // ❌ Si monto es negativo, siempre retorna true
+    BigDecimal disponibleConSobregiro = saldoDisponible.add(sobregiroAutorizado);
+    return disponibleConSobregiro.compareTo(monto) >= 0;
+}
+
+------------ NIVEL 🟠 DIFÍCIL (POO) ------------
+
+[Error 9] No usa super.puedeRetirar() para validaciones base
+@Override
+public boolean puedeRetirar(BigDecimal monto) {
+    // ❌ No llama a super.puedeRetirar() para validar bloqueo, etc.
+    BigDecimal disponibleConSobregiro = saldoDisponible.add(sobregiroAutorizado);
+    return disponibleConSobregiro.compareTo(monto) >= 0;
+}
+
+[Error 10] Lógica de cobro de comisión mal diseñada
+public void cobrarComisionManejo() {
+    // ❌ Mezcla lógica de cobro con lógica de sobregiro
+    // Deberían ser métodos separados
+}
+
+[Error 11] No hay método para reponer cheques
+public void recargarCheques(int cantidad) {
+    // ❌ No existe método para comprar más cheques
+    // this.chequesDisponibles += cantidad;
+}
+
+[Error 12] El método validarCondicionesEspeciales no usa el saldo mínimo
+public boolean validarCondicionesEspeciales() {
+    // ❌ Solo valida comisión, no el saldo mínimo requerido
+    return saldoDisponible.compareTo(comisionManejo) >= 0;
+}
+// Debería incluir: && saldoDisponible.compareTo(saldoMinimoRequerido) >= 0
+
+------------ NIVEL 🔴 COMPLEJO (DISEÑO) ------------
+
+[Error 13] El sobregiro se resta del límite total
+this.sobregiroAutorizado = sobregiroAutorizado.subtract(faltante);
+// ❌ Esto reduce permanentemente el límite de sobregiro
+// Debería tener un contador de sobregiro usado aparte
+
+[Error 14] No hay límite de veces que puede usar sobregiro
+// ❌ Podría usar sobregiro infinitas veces hasta agotar límite
+// Debería tener: private int usosSobregiroHoy;
+
+[Error 15] No registra los cheques usados
+private int chequesDisponibles;
+// ❌ No guarda historial de cheques usados
+// Debería tener: private List<Cheque> chequesEmitidos;
+
+[Error 16] La comisión de manejo no considera días del mes
+public void cobrarComisionManejo() {
+    // ❌ Siempre cobra completa, sin importar cuándo se abrió
+    // Debería calcular proporcional por días
+}
+
+[Error 17] No valida que el titular pueda tener cuenta corriente
+// ❌ Debería validar historial crediticio, ingresos, etc.
+// Falta: public boolean validarRequisitosApertura()
+
+[Error 18] El método usarCheque debería recibir el monto
+public void usarCheque() {
+    // ❌ No recibe monto, no valida saldo suficiente
+    // Debería: public boolean usarCheque(BigDecimal monto)
+}
+
+[Error 19] No hay interés por sobregiro
+// ❌ Usar sobregiro debería generar intereses
+// Falta: private BigDecimal tasaInteresSobregiro;
+
+[Error 20] No hay límite de cheques por día
+public void usarCheque() {
+    if (chequesDisponibles > 0) {
+        this.chequesDisponibles--; // ❌ Podría usar 10 cheques en un día
+    }
+}
+
+------------------------------------------------------------------------
+
+========================================
+ARCHIVO: CuentaJuventud.java
+========================================
+
+------------ NIVEL 🟢 FÁCIL (SINTAXIS) ------------
+
+[Error 1] Herencia mal escrita
+public class CuentaJuventud extends CuentaBancaria { // ❌ Correcto
+    private LocalDate fechaNacimientoTitular
+    private LocalDateTime fechaFinBeneficio; // ❌ Falta ;
+}
+
+[Error 2] Paréntesis en método
+public CuentaJuventud(String numeroCuenta, String nombreTitular, 
+                          String documentoTitular, LocalDate fechaNacimiento {
+    super(numeroCuenta, nombreTitular, documentoTitular);
+} // ❌ Falta ) en parámetros
+
+[Error 3] Tipo incorrecto en multiplicación
+return saldoDisponible.multiply("0.02"); // ❌ Debería ser new BigDecimal("0.02")
+
+[Error 4] Llave de cierre extra
+public class CuentaJuventud extends CuentaBancaria {
+    // ... código
+}
+} // ❌ Llave de más
+
+------------ NIVEL 🟡 MEDIO (LÓGICA) ------------
+
+[Error 5] No valida fecha de nacimiento futura
+public CuentaJuventud(... LocalDate fechaNacimiento) {
+    // ❌ Si fechaNacimiento es futura, la edad sería negativa
+    this.fechaNacimientoTitular = fechaNacimiento;
+}
+
+[Error 6] El beneficio termina a los 5 años exactos, sin importar edad
+this.fechaFinBeneficio = LocalDateTime.now().plusYears(5);
+// ❌ Si hoy cumple 24 años, a los 29 aún tiene beneficio (debería ser hasta 25)
+
+[Error 7] No valida que el titular sea realmente joven al abrir
+public CuentaJuventud(...) {
+    // ❌ No valida que edad <= 25 al momento de abrir
+}
+
+[Error 8] Método beneficioActivo duplica validación
+public boolean beneficioActivo() {
+    return LocalDateTime.now().isBefore(fechaFinBeneficio) && validarCondicionesEspeciales();
+    // ❌ validarCondicionesEspeciales() ya valida edad <= 25
+}
+
+------------ NIVEL 🟠 DIFÍCIL (POO) ------------
+
+[Error 9] No usa super.calcularIntereses() antes de aplicar tasa preferencial
+@Override
+public BigDecimal calcularIntereses() {
+    // ❌ Debería obtener el interés base y luego sumar preferencial
+    return saldoDisponible.multiply(new BigDecimal("0.02"));
+}
+
+[Error 10] La edad se calcula con LocalDate.now() cada vez
+public int calcularEdad() {
+    return Period.between(fechaNacimientoTitular, LocalDate.now()).getYears();
+    // ❌ Debería usar una fecha fija (ej: fecha de consulta)
+}
+
+[Error 11] No hay método para renovar beneficio al cumplir años
+// ❌ Si el titular cumple años, debería reevaluarse el beneficio
+// Falta: public void reevaluarBeneficio()
+
+[Error 12] El cupo diario es fijo, no ajustado por edad
+this.cupoDiarioRetiro = new BigDecimal("500000");
+// ❌ Un joven de 18 años tiene mismo cupo que uno de 24
+
+------------ NIVEL 🔴 COMPLEJO (DISEÑO) ------------
+
+[Error 13] La edad máxima (25) está hardcodeada en varios lugares
+return edad <= 25; // ❌ En validarCondicionesEspeciales
+// Debería ser: private static final int EDAD_MAXIMA = 25;
+
+[Error 14] No hay transición a cuenta normal al cumplir 25
+// ❌ Cuando el titular cumple 25, la cuenta debería convertirse automáticamente
+// Falta: public CuentaBancaria convertirACuentaNormal()
+
+[Error 15] Los cupos reducidos no se ajustan al crecer
+this.cupoDiarioRetiro = new BigDecimal("500000");
+// ❌ Al acercarse a 25, podría aumentar el cupo gradualmente
+
+[Error 16] No valida que el titular no tenga otra cuenta juvenil
+// ❌ Podría abrir múltiples cuentas juveniles con mismo documento
+// Debería validar en el sistema
+
+[Error 17] La fechaFinBeneficio se calcula al abrir, no se actualiza
+this.fechaFinBeneficio = LocalDateTime.now().plusYears(5);
+// ❌ Si el titular tenía 20, a los 23 aún tiene 2 años de beneficio
+// Debería ser: fechaFinBeneficio = fechaNacimiento.plusYears(25)
+
+[Error 18] No hay límite de depósitos para jóvenes
+// ❌ Debería tener un límite de saldo o depósitos mensuales
+// Falta: private BigDecimal limiteSaldoJuvenil
+
+[Error 19] No valida que los padres o tutores autoricen (si es menor de 18)
+// ❌ Si edad < 18, debería requerir autorización
+// Falta: private String tutorAutorizado
+
+[Error 20] El beneficio de interés preferencial no tiene tope
+return saldoDisponible.multiply(new BigDecimal("0.02"));
+// ❌ Podría generar intereses gigantes si tiene mucho saldo
+// Debería tener un tope: Math.min(saldo, LIMITE) * tasa
+
+------------------------------------------------------------------
+
+========================================
+ARCHIVO: CuentaTerceraEdad.java
+========================================
+
+------------ NIVEL 🟢 FÁCIL (SINTAXIS) ------------
+
+[Error 1] Herencia mal escrita
+public class CuentaTerceraEdad extends CuentaBancaria { // ❌ Correcto
+    private LocalDate fechaNacimientoTitular
+    private String beneficioExclusivo; // ❌ Falta ;
+}
+
+[Error 2] Paréntesis en constructor
+public CuentaTerceraEdad(String numeroCuenta, String nombreTitular, 
+                             String documentoTitular, LocalDate fechaNacimiento {
+    super(numeroCuenta, nombreTitular, documentoTitular);
+} // ❌ Falta ) en parámetros
+
+[Error 3] Tipo incorrecto en BigDecimal
+this.descuentoComisiones = "0.5"; // ❌ Debería ser new BigDecimal("0.5")
+
+[Error 4] Llave de cierre extra
+public class CuentaTerceraEdad extends CuentaBancaria {
+    // ... código
+}
+} // ❌ Llave de más
+
+------------ NIVEL 🟡 MEDIO (LÓGICA) ------------
+
+[Error 5] No valida fecha de nacimiento futura
+public CuentaTerceraEdad(... LocalDate fechaNacimiento) {
+    // ❌ Si fechaNacimiento es futura, la edad sería negativa
+    this.fechaNacimientoTitular = fechaNacimiento;
+}
+
+[Error 6] El descuento de comisiones se aplica sin límite
+public BigDecimal aplicarDescuentoComision(BigDecimal comisionOriginal) {
+    return comisionOriginal.multiply(BigDecimal.ONE.subtract(descuentoComisiones));
+    // ❌ Si descuentoComisiones es 0.5, siempre 50% sin tope mensual
+}
+
+[Error 7] No valida que el titular sea realmente mayor al abrir
+public CuentaTerceraEdad(...) {
+    // ❌ No valida que edad >= 60 al momento de abrir
+}
+
+[Error 8] El beneficioExclusivo es un String fijo, no configurable
+this.beneficioExclusivo = "Sin costo de mantenimiento";
+// ❌ Podría tener múltiples beneficios (descuentos en servicios, etc.)
+
+------------ NIVEL 🟠 DIFÍCIL (POO) ------------
+
+[Error 9] No usa super.calcularIntereses() antes de aplicar tasa preferencial
+@Override
+public BigDecimal calcularIntereses() {
+    // ❌ Debería obtener el interés base y luego sumar preferencial
+    return saldoDisponible.multiply(tasaInteresMensual);
+}
+
+[Error 10] La edad se calcula con LocalDate.now() cada vez
+public int calcularEdad() {
+    return Period.between(fechaNacimientoTitular, LocalDate.now()).getYears();
+    // ❌ Debería usar una fecha fija para cálculos consistentes
+}
+
+[Error 11] No hay método para verificar si sigue siendo adulto mayor
+// ❌ Al cumplir años, debería reevaluarse automáticamente
+// Falta: public void verificarElegibilidad()
+
+[Error 12] El método aplicarDescuentoComision debería estar en servicio aparte
+public BigDecimal aplicarDescuentoComision(BigDecimal comisionOriginal) {
+    // ❌ Lógica de negocio mezclada con entidad
+    // Debería estar en una clase de servicios
+}
+
+------------ NIVEL 🔴 COMPLEJO (DISEÑO) ------------
+
+[Error 13] La edad mínima (60) está hardcodeada
+return edad >= 60; // ❌ En validarCondicionesEspeciales
+// Debería ser: private static final int EDAD_MINIMA = 60;
+
+[Error 14] No hay transición a cuenta normal al salir del rango
+// ❌ Si el titular deja de ser adulto mayor (ej: fallece), la cuenta debería cerrarse
+// Falta: public void manejarSalidaDeRango()
+
+[Error 15] BeneficioExclusivo como String limita la expansión
+private String beneficioExclusivo;
+// ❌ Debería ser List<String> beneficios o un sistema de beneficios configurable
+
+[Error 16] No valida que el titular no tenga otra cuenta de tercera edad
+// ❌ Podría abrir múltiples cuentas con mismo documento
+// Debería validar en el sistema
+
+[Error 17] La tasa de interés preferencial no tiene límite de saldo
+return saldoDisponible.multiply(tasaInteresMensual);
+// ❌ Podría generar intereses excesivos en cuentas muy grandes
+// Debería tener un tope: Math.min(saldo, LIMITE) * tasa
+
+[Error 18] No considera beneficios adicionales por edad avanzada
+// ❌ A los 70, 80 años podría tener más beneficios
+// Falta: public BigDecimal getBeneficioPorEdad()
+
+[Error 19] El descuento de comisiones se aplica a todas por igual
+private BigDecimal descuentoComisiones = new BigDecimal("0.5");
+// ❌ Algunas comisiones podrían tener descuento diferente
+// Debería ser Map<String, BigDecimal> descuentosPorComision
+
+[Error 20] No valida que el titular tenga pensión o ingreso fijo
+// ❌ Requisito común para cuentas de adultos mayores
+// Falta: private boolean validarPension()
+
+----------------------------------------------------------------
+========================================
+ARCHIVO: CuentaAhorro.java
+========================================
+
+------------ NIVEL 🟢 FÁCIL (SINTAXIS) ------------
+
+[Error 1] Herencia mal escrita
+public class CuentaAhorro extends CuentaBancaria { // ❌ Correcto
+    private BigDecimal interesAcumulado
+    private int mesesSinMovimiento; // ❌ Falta ;
+}
+
+[Error 2] Paréntesis en método
+public void actualizarMesesSinMovimiento( {
+    long meses = ChronoUnit.MONTHS.between(fechaUltimoAcceso, LocalDateTime.now());
+    this.mesesSinMovimiento = (int) meses;
+} // ❌ Paréntesis mal cerrado
+
+[Error 3] Tipo incorrecto en BigDecimal
+this.saldoMinimoRequerido = "50000"; // ❌ Debería ser new BigDecimal("50000")
+
+[Error 4] Llave de cierre extra
+public class CuentaAhorro extends CuentaBancaria {
+    // ... código
+}
+} // ❌ Llave de más
+
+------------ NIVEL 🟡 MEDIO (LÓGICA) ------------
+
+[Error 5] Calcula intereses aunque la cuenta esté inactiva
+@Override
+public BigDecimal calcularIntereses() {
+    // ❌ Si tieneInactividad() es true, no debería generar intereses
+    BigDecimal intereses = saldoDisponible.multiply(tasaInteresMensual);
+    this.interesAcumulado = interesAcumulado.add(intereses);
+    return intereses;
+}
+
+[Error 6] No valida que el saldo mínimo se mantenga después de retiros
+public boolean validarCondicionesEspeciales() {
+    // ❌ Solo valida el saldo actual, no después de operaciones
+    return saldoDisponible.compareTo(saldoMinimoRequerido) >= 0;
+}
+
+[Error 7] Meses sin movimiento no se actualiza automáticamente
+public void actualizarMesesSinMovimiento() {
+    // ❌ Debería llamarse en cada operación (depósito/retiro)
+    // Pero no se llama automáticamente
+}
+
+[Error 8] La inactividad se mide en meses exactos, no días
+long meses = ChronoUnit.MONTHS.between(fechaUltimoAcceso, LocalDateTime.now());
+// ❌ Si pasan 45 días, es 1 mes (debería ser 1.5 meses)
+
+------------ NIVEL 🟠 DIFÍCIL (POO) ------------
+
+[Error 9] No usa super.calcularIntereses() para el cálculo base
+@Override
+public BigDecimal calcularIntereses() {
+    // ❌ Ignora completamente la lógica de la superclase
+    BigDecimal intereses = saldoDisponible.multiply(tasaInteresMensual);
+    this.interesAcumulado = interesAcumulado.add(intereses);
+    return intereses;
+}
+
+[Error 10] El interés acumulado nunca se capitaliza
+this.interesAcumulado = interesAcumulado.add(intereses);
+// ❌ El interés acumulado debería sumarse al saldo periódicamente
+// Falta: public void capitalizarIntereses()
+
+[Error 11] No hay límite de interés acumulado
+// ❌ Podría acumular intereses infinitos sin límite
+// Debería tener: private BigDecimal topeIntereses
+
+[Error 12] El método tieneInactividad no considera el saldo mínimo
+public boolean tieneInactividad() {
+    return mesesSinMovimiento >= 6; // ❌ No importa si tiene saldo alto
+}
+
+------------ NIVEL 🔴 COMPLEJO (DISEÑO) ------------
+
+[Error 13] La tasa de interés es fija para todas las cuentas
+this.tasaInteresMensual = new BigDecimal("0.015");
+// ❌ Debería depender del saldo o tiempo (tasas escalonadas)
+
+[Error 14] No hay penalización por saldo menor al mínimo
+// ❌ Si baja del mínimo, no hay comisión
+// Debería: public void cobrarPenalizacion()
+
+[Error 15] El interés se calcula sobre saldo total, no por tramos
+return saldoDisponible.multiply(tasaInteresMensual);
+// ❌ Podría tener tramos: 0-1M: 1%, 1M-5M: 1.5%, etc.
+
+[Error 16] No hay límite de retiros mensuales
+// ❌ Cuentas de ahorro suelen tener límite de retiros
+// Falta: private int retirosMes; private int limiteRetiros
+
+[Error 17] La inactividad no genera cierre de cuenta
+public boolean tieneInactividad() {
+    return mesesSinMovimiento >= 6;
+}
+// ❌ Debería activar proceso de cierre o cuenta inactiva
+
+[Error 18] No hay beneficio por antigüedad
+// ❌ Cuentas con muchos años podrían tener mejor tasa
+// Falta: private LocalDateTime fechaApertura (ya existe) y usarla
+
+[Error 19] El saldo mínimo es igual para todas las cuentas
+private BigDecimal saldoMinimoRequerido = new BigDecimal("50000");
+// ❌ Podría variar según el tipo de cuenta ahorro (joven, premium, etc.)
+
+[Error 20] No valida que el titular tenga capacidad de ahorro
+// ❌ Debería validar ingresos mínimos o historial
+// Falta: private boolean validarCapacidadAhorro()
