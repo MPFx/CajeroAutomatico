@@ -48,7 +48,7 @@ Este proyecto fue desarrollado con fines de aprendizaje y práctica de:
 - Control de versiones con Git y GitHub Pages
 
 ## Derechos de autor
-**© 2026 ISC Israel de Jesus Mar Parada (MPFc++)**
+**© 2026 ISC Israel de Jesus Mar Parada (MPFx++)**
 
 Todos los derechos reservados.
 
